@@ -1,6 +1,8 @@
 # Deploy this project to Vercel
 
-The root `vercel.json` builds only the React frontend and routes `/album` and `/print` to the app. The Express API remains a separate Cloud Run deployment. No Vercel login or deployment has been completed automatically.
+**Current setup:** React on Vercel plus Apps Script for Drive storage. Follow [apps-script/README.md](apps-script/README.md), set `APPS_SCRIPT_URL` and `APPS_SCRIPT_SECRET` as server-only Vercel variables, and set `VITE_STORAGE_PROVIDER=apps-script`. The root deployment includes `/api/photos`. No Cloud Run or production `VITE_API_URL` is needed in this mode. Use this project root as Vercel Root Directory.
+
+## Legacy Express / Cloud Run instructions
 
 1. Push this project's source to a Git repository. Keep `.env` files out of Git; never manually upload them. The Google credentials stay only in backend local configuration and Cloud Run Secret Manager.
 2. In Vercel, choose **Add New → Project → Import Git Repository**.
