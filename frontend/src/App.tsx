@@ -25,6 +25,7 @@ import {
 import { Button } from "./components/ui/button";
 import type { Memory } from "./types";
 import { authorize, upload } from "./services/upload";
+import { USE_APPS_SCRIPT, MAX_SOURCE_BYTES } from "./services/appsScript";
 const schema = z.object({
   guestName: z.string().trim().max(80, "Please use 80 characters or fewer."),
 });
@@ -58,12 +59,21 @@ export default function App() {
     const messages: string[] = [];
     const next = [...latest.current];
     for (const file of Array.from(files)) {
-      if (!supported.test(file.name)) {
+      if (
+        !(USE_APPS_SCRIPT ? /\.(jpe?g|png|webp|heic|heif)$/i : supported).test(
+          file.name,
+        )
+      ) {
         messages.push(`${file.name}: choose a supported photo or video.`);
         continue;
       }
-      if (!file.size || file.size > 2 * 1024 ** 3) {
-        messages.push(`${file.name}: files must be between 1 byte and 2 GB.`);
+      if (
+        !file.size ||
+        file.size > (USE_APPS_SCRIPT ? MAX_SOURCE_BYTES : 2 * 1024 ** 3)
+      ) {
+        messages.push(
+          `${file.name}: choose a photo up to ${USE_APPS_SCRIPT ? "10 MB" : "2 GB"}.`,
+        );
         continue;
       }
       if (
@@ -117,29 +127,35 @@ export default function App() {
       );
       let cursor = 0;
       await Promise.all(
-        Array.from({ length: Math.min(2, pending.length) }, async () => {
-          while (cursor < pending.length) {
-            const item = pending[cursor++];
-            patch(item.id, { status: "uploading", error: undefined });
-            try {
-              await upload(
-                item,
-                guestName,
-                access,
-                (s) => patch(item.id, { session: s }),
-                (n) => patch(item.id, { progress: n }),
-              );
-              patch(item.id, { status: "success", progress: 100 });
-            } catch (e) {
-              if (e instanceof Error && /authorization expired/.test(e.message))
-                setBatch("");
-              patch(item.id, {
-                status: "failed",
-                error: e instanceof Error ? e.message : "Please retry.",
-              });
+        Array.from(
+          { length: Math.min(USE_APPS_SCRIPT ? 1 : 2, pending.length) },
+          async () => {
+            while (cursor < pending.length) {
+              const item = pending[cursor++];
+              patch(item.id, { status: "uploading", error: undefined });
+              try {
+                await upload(
+                  item,
+                  guestName,
+                  access,
+                  (s) => patch(item.id, { session: s }),
+                  (n) => patch(item.id, { progress: n }),
+                );
+                patch(item.id, { status: "success", progress: 100 });
+              } catch (e) {
+                if (
+                  e instanceof Error &&
+                  /authorization expired/.test(e.message)
+                )
+                  setBatch("");
+                patch(item.id, {
+                  status: "failed",
+                  error: e instanceof Error ? e.message : "Please retry.",
+                });
+              }
             }
-          }
-        }),
+          },
+        ),
       );
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Please try again.");
@@ -170,7 +186,11 @@ export default function App() {
             </span>
             <div>
               <h2>Add your memories</h2>
-              <p>A photo, a video, a little moment.</p>
+              <p>
+                {USE_APPS_SCRIPT
+                  ? "A photo, a little moment."
+                  : "A photo, a video, a little moment."}
+              </p>
             </div>
           </div>
           <label className="name-label" htmlFor="guest">
@@ -195,7 +215,11 @@ export default function App() {
             type="file"
             className="sr-only"
             multiple
-            accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov"
+            accept={
+              USE_APPS_SCRIPT
+                ? ".jpg,.jpeg,.png,.webp,.heic,.heif"
+                : ".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov"
+            }
             onChange={(e) => {
               add(e.target.files);
               e.target.value = "";
@@ -206,7 +230,7 @@ export default function App() {
             ref={camera}
             type="file"
             className="sr-only"
-            accept="image/*,video/*"
+            accept={USE_APPS_SCRIPT ? "image/*" : "image/*,video/*"}
             capture="environment"
             onChange={(e) => {
               add(e.target.files);
@@ -232,7 +256,9 @@ export default function App() {
             </span>
             <h3>Your moments belong here</h3>
             <p className="picker-hint">
-              Pick photos & videos from your gallery.
+              {USE_APPS_SCRIPT
+                ? "Pick photos from your gallery."
+                : "Pick photos & videos from your gallery."}
             </p>
             <Button
               variant="outline"
@@ -240,7 +266,8 @@ export default function App() {
               disabled={busy}
               onClick={() => input.current?.click()}
             >
-              <Plus size={18} /> Choose photos & videos
+              <Plus size={18} />{" "}
+              {USE_APPS_SCRIPT ? "Choose photos" : "Choose photos & videos"}
             </Button>
             <button
               type="button"
@@ -250,7 +277,11 @@ export default function App() {
             >
               <Camera size={16} /> Take a photo
             </button>
-            <small>JPG, PNG, WebP, HEIC, MP4 & MOV · Up to 2 GB per file</small>
+            <small>
+              {USE_APPS_SCRIPT
+                ? "JPG, PNG, WebP & HEIC · Up to 10 MB per photo. Large photos are compressed."
+                : "JPG, PNG, WebP, HEIC, MP4 & MOV · Up to 2 GB per file"}
+            </small>
           </div>
           {pending.length > 0 && (
             <div className="file-section">
@@ -275,12 +306,14 @@ export default function App() {
                     <small>
                       {format(i.file.size)} ·{" "}
                       {i.status === "uploading"
-                        ? `${i.progress}% uploaded`
+                        ? USE_APPS_SCRIPT
+                          ? "Uploading..."
+                          : `${i.progress}% uploaded`
                         : i.status === "failed"
                           ? "Ready to retry"
                           : "Ready to share"}
                     </small>
-                    {i.status === "uploading" && (
+                    {i.status === "uploading" && !USE_APPS_SCRIPT && (
                       <progress
                         max={100}
                         value={i.progress}

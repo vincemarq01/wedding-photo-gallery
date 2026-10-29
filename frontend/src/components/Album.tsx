@@ -9,7 +9,7 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { API, getPhotos, type AlbumPhoto } from "../services/album";
+import { getPhotoSource, getPhotos, type AlbumPhoto } from "../services/album";
 import { Button } from "./ui/button";
 import { AppLink } from "./AppLink";
 
@@ -21,18 +21,59 @@ function PhotoImage({
   large?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const [source, setSource] = useState("");
+  const container = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    let started = false;
+    const load = () => {
+      if (started) return;
+      started = true;
+      getPhotoSource(photo, large, controller.signal)
+        .then((url) => {
+          if (!controller.signal.aborted) setSource(url);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setFailed(true);
+        });
+    };
+    const element = container.current;
+    const observer =
+      !large && element && typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              if (entries.some((e) => e.isIntersecting)) {
+                observer?.disconnect();
+                load();
+              }
+            },
+            { rootMargin: "200px" },
+          )
+        : null;
+    if (observer && element) observer.observe(element);
+    else load();
+    return () => {
+      controller.abort();
+      observer?.disconnect();
+    };
+  }, [photo.id, photo.image, large]);
   return failed ? (
     <span className="photo-unavailable">
       <Image size={28} />
       <span>Preview is being prepared</span>
     </span>
-  ) : (
+  ) : source ? (
     <img
-      src={API + photo.image}
+      src={source}
       alt={photo.name}
       loading={large ? "eager" : "lazy"}
       onError={() => setFailed(true)}
     />
+  ) : (
+    <span ref={container} className="photo-unavailable" role="status">
+      <LoaderCircle size={20} className="spin" />
+      <span>Loading photo...</span>
+    </span>
   );
 }
 export default function Album({ revision }: { revision: number }) {
