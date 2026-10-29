@@ -48,8 +48,8 @@ export default async function handler(
   }
   windows.set(ip, current);
   try {
-    const endpoint = process.env.APPS_SCRIPT_URL;
-    const secret = process.env.APPS_SCRIPT_SECRET;
+    const endpoint = process.env.APPS_SCRIPT_URL?.trim();
+    const secret = process.env.APPS_SCRIPT_SECRET?.trim();
     if (!endpoint || !secret) {
       send(503, {
         error:
@@ -62,8 +62,13 @@ export default async function handler(
       url.protocol !== "https:" ||
       url.hostname !== "script.google.com" ||
       !/^\/macros\/s\/[\w-]+\/exec$/.test(url.pathname)
-    )
-      throw Error("Invalid Apps Script endpoint");
+    ) {
+      send(503, {
+        error:
+          "APPS_SCRIPT_URL must be the Google Apps Script Web app URL ending in /exec, not the Vercel website URL.",
+      });
+      return;
+    }
     let body: unknown = req.body;
     if (body === undefined) {
       let size = 0;
@@ -111,22 +116,50 @@ export default async function handler(
       signal: AbortSignal.timeout(50000),
     });
     if (!response.ok) {
+      const status = response.status;
       send(502, {
-        error: "Our album is temporarily unavailable. Please retry.",
+        error:
+          status === 401 || status === 403
+            ? "Apps Script denied access. Deploy it as Execute as: Me and Who has access: Anyone, then update the deployment."
+            : status === 404 || status === 410
+              ? "Apps Script deployment was not found. Copy its current Web app /exec URL into APPS_SCRIPT_URL in Vercel, then redeploy."
+              : status === 405
+                ? "Apps Script rejected the request method. Deploy the current Code.gs containing doPost as a new version."
+                : `Apps Script returned HTTP ${status}. Check its deployment access and Executions page, then retry.`,
       });
       return;
     }
-    const data = (await response.json()) as {
+    let data: {
       ok?: boolean;
       data?: unknown;
       error?: string;
     };
+    try {
+      data = await response.json();
+    } catch {
+      send(502, {
+        error:
+          "Apps Script returned a sign-in or HTML page instead of album data. Check Execute as: Me, access: Anyone, and deploy the latest Code.gs version.",
+      });
+      return;
+    }
+    if (!data || typeof data !== "object" || typeof data.ok !== "boolean") {
+      send(502, {
+        error:
+          "Apps Script returned an unexpected response. Deploy the current wedding-photo-sharing/apps-script/Code.gs as a new version.",
+      });
+      return;
+    }
     if (!data.ok) {
       send(400, { error: data.error || "Please retry your upload." });
       return;
     }
     send(200, data.data);
-  } catch {
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      send(400, { error: "Invalid photo request JSON." });
+      return;
+    }
     send(502, {
       error: "Our album connection was interrupted. Please retry in a moment.",
     });
