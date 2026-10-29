@@ -41,6 +41,8 @@ const folder = {
   getFiles: () => iterator([...saved.values()]),
   createFile: (blob) => {
     writes++;
+    // Drive can infer a PNG MIME type from an otherwise opaque temporary part.
+    if(blob.mime==='application/octet-stream' && blob.bytes[0]===137 && blob.bytes[1]===80) blob={...blob,mime:'image/png'};
     const result = file("photo_" + writes, blob);
     saved.set(result.getId(), result);
     return result;
@@ -197,7 +199,7 @@ assert.equal(
 );
 assert.ok(
   [...saved.values()]
-    .filter((f) => f.getMimeType() === "application/octet-stream")
+    .filter((f) => f.getName().startsWith(".wedding-part-"))
     .every((f) => f.isTrashed()),
   "Temporary parts must be cleaned up",
 );

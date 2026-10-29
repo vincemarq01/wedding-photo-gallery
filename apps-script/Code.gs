@@ -46,7 +46,7 @@ function originalState_(id) {
   return state;
 }
 function discardParts_(state) {
-  (state.parts || []).forEach(function(part) { if (part) try { const file = DriveApp.getFileById(part.id); if (belongsToAlbum_(file) && file.getMimeType() === 'application/octet-stream') file.setTrashed(true); } catch (_) {} });
+  (state.parts || []).forEach(function(part) { if (part) try { const file = DriveApp.getFileById(part.id); if (belongsToAlbum_(file) && file.getName().indexOf('.wedding-part-') === 0) file.setTrashed(true); } catch (_) {} });
 }
 function beginOriginal_(payload) {
   if (!payload || typeof payload.uploadId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(payload.uploadId)) throw new Error('Invalid upload ID.');
@@ -81,7 +81,8 @@ function savePart_(payload) {
   try {
     const state = originalState_(payload.uploadId); if (state.complete) return state;
     const count = Math.ceil(state.size / PART_BYTES);
-    if (!Number.isInteger(payload.index) || payload.index < 0 || payload.index >= count || typeof payload.data !== 'string' || payload.data.length > Math.ceil(PART_BYTES / 3) * 4 + 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload.data)) throw new Error('Invalid photo part.');
+    if (!Number.isInteger(payload.index) || payload.index < 0 || payload.index >= count) throw new Error('Invalid photo part number. Remove the photo and choose it again.');
+    if (typeof payload.data !== 'string' || payload.data.length > Math.ceil(PART_BYTES / 3) * 4 + 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload.data)) throw new Error('Invalid photo part data. Refresh the website and retry.');
     const bytes = Utilities.base64Decode(payload.data);
     const expected = Math.min(PART_BYTES, state.size - payload.index * PART_BYTES);
     if (bytes.length !== expected) throw new Error('Incomplete photo part. Please retry.');
@@ -100,7 +101,9 @@ function finishOriginal_(payload) {
   for (let index = 0; index < Math.ceil(state.size / PART_BYTES); index++) {
     const part = state.parts[index]; if (!part) throw new Error('Some photo parts are missing. Tap retry to continue.');
     const file = DriveApp.getFileById(part.id);
-    if (!belongsToAlbum_(file) || file.getMimeType() !== 'application/octet-stream') throw new Error('Invalid photo part.');
+    // Drive may recognize the first part as image/png or image/jpeg. MIME is not
+    // an identity check: validate the server-recorded ID, folder, exact name and hash.
+    if (!belongsToAlbum_(file) || file.isTrashed() || file.getName() !== '.wedding-part-' + payload.uploadId + '-' + index) throw new Error('Photo part is missing or no longer belongs to this upload. Remove the photo and choose it again.');
     const data = file.getBlob().getBytes();
     if (sha256_(data) !== part.sha256) throw new Error('Photo part verification failed. Please select the photo again.');
     bytes = bytes.concat(data);
@@ -177,7 +180,7 @@ function getAlbumPhotos_(cursor) {
   while (iterator.hasNext() && photos.length < 24 && scanned < 200) {
     const file = iterator.next(); scanned++;
     // Continuation tokens may come from a visitor: always recheck folder membership.
-    if (!belongsToAlbum_(file) || file.isTrashed() || PHOTO_TYPES.indexOf(file.getMimeType()) === -1) continue;
+    if (!belongsToAlbum_(file) || file.isTrashed() || file.getName().indexOf('.wedding-part-') === 0 || PHOTO_TYPES.indexOf(file.getMimeType()) === -1) continue;
     photos.push({ id: file.getId(), name: file.getName(), createdAt: file.getDateCreated().toISOString() });
   }
   photos.sort(function(a, b) { return b.createdAt.localeCompare(a.createdAt); });
@@ -187,7 +190,7 @@ function getAlbumPhotos_(cursor) {
 function getPhotoPreview_(id, large) {
   if (typeof id !== 'string' || !/^[\w-]{5,200}$/.test(id)) throw new Error('Photo not found.');
   const file = DriveApp.getFileById(id);
-  if (!belongsToAlbum_(file) || file.isTrashed() || PHOTO_TYPES.indexOf(file.getMimeType()) === -1) throw new Error('Photo not found.');
+  if (!belongsToAlbum_(file) || file.isTrashed() || file.getName().indexOf('.wedding-part-') === 0 || PHOTO_TYPES.indexOf(file.getMimeType()) === -1) throw new Error('Photo not found.');
   let blob;
   if (large && ['image/jpeg', 'image/png', 'image/webp'].indexOf(file.getMimeType()) !== -1 && file.getSize() <= MAX_PREVIEW_BYTES) blob = file.getBlob();
   else blob = file.getThumbnail();
