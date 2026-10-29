@@ -101,7 +101,11 @@ export default async function handler(
       return;
     }
     const input = body as { action?: unknown; payload?: unknown };
-    if (!["upload", "list", "preview"].includes(String(input.action))) {
+    if (
+      !["upload", "list", "preview", "begin", "part", "finish"].includes(
+        String(input.action),
+      )
+    ) {
       send(400, { error: "Invalid photo action." });
       return;
     }

@@ -1,9 +1,9 @@
 export const USE_APPS_SCRIPT =
   import.meta.env.VITE_STORAGE_PROVIDER !== "express";
 export const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
-const MAX_TRANSFER_BYTES = 3 * 1024 * 1024;
+const PART_BYTES = 1024 * 1024;
 export async function scriptCall<T>(
-  action: "upload" | "list" | "preview",
+  action: "upload" | "list" | "preview" | "begin" | "part" | "finish",
   payload: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
@@ -26,59 +26,59 @@ export async function scriptCall<T>(
   if (!response.ok) throw new Error(data.error || "Please try again.");
   return data as T;
 }
-export async function preparePhoto(
-  file: File,
-): Promise<{ name: string; data: string }> {
-  if (file.size > MAX_SOURCE_BYTES)
-    throw new Error("Please choose a photo up to 10 MB.");
-  let image: Blob = file;
-  let name = file.name;
-  if (file.size > MAX_TRANSFER_BYTES) {
-    const url = URL.createObjectURL(file);
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      const scale = Math.min(
-        1,
-        2560 / Math.max(img.naturalWidth, img.naturalHeight),
-      );
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw Error();
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(img, 0, 0, canvas.width, canvas.height);
-      for (const quality of [0.88, 0.76, 0.62]) {
-        image = await new Promise<Blob>((resolve, reject) =>
-          canvas.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(Error())),
-            "image/jpeg",
-            quality,
-          ),
-        );
-        if (image.size <= MAX_TRANSFER_BYTES) break;
-      }
-      name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
-    } catch {
-      throw new Error(
-        "This photo is too large to send. Please export it as a smaller JPG (up to 3 MB).",
-      );
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-  if (image.size > MAX_TRANSFER_BYTES)
-    throw new Error(
-      "Please choose a smaller photo (up to 3 MB after compression).",
-    );
-  const data = await new Promise<string>((resolve, reject) => {
+function encodePart(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(",")[1]!);
     reader.onerror = () => reject(new Error("Could not read this photo."));
-    reader.readAsDataURL(image);
+    reader.readAsDataURL(blob);
   });
-  return { name, data };
+}
+export async function uploadOriginal(
+  file: File,
+  uploadId: string,
+  guestName: string,
+  onProgress: (value: number) => void,
+) {
+  if (!file.size || file.size > MAX_SOURCE_BYTES)
+    throw new Error("Please choose a photo up to 10 MB.");
+  if (!window.crypto?.subtle)
+    throw new Error(
+      "Please open the secure HTTPS website to upload original photos.",
+    );
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer(),
+  );
+  const sha256 = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  const state = await scriptCall<{ complete: boolean; received?: number[] }>(
+    "begin",
+    { uploadId, name: file.name, size: file.size, sha256, guestName },
+  );
+  if (state.complete) {
+    onProgress(100);
+    return;
+  }
+  const received = new Set(state.received || []);
+  const count = Math.ceil(file.size / PART_BYTES);
+  for (let index = 0; index < count; index++) {
+    if (!received.has(index)) {
+      const data = await encodePart(
+        file.slice(index * PART_BYTES, (index + 1) * PART_BYTES),
+      );
+      await scriptCall("part", { uploadId, index, data });
+    }
+    onProgress(
+      Math.min(
+        95,
+        Math.round(
+          (Math.min(file.size, (index + 1) * PART_BYTES) / file.size) * 95,
+        ),
+      ),
+    );
+  }
+  await scriptCall("finish", { uploadId });
+  onProgress(100);
 }

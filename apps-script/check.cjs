@@ -3,6 +3,7 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const ts = require("typescript");
+const { createHash } = require("node:crypto");
 const folderId = "1Dw05UY5SdPt1jXxFv7pj4Nty1WWe1R32";
 const secret = "test-connection-key-" + "x".repeat(40);
 const properties = { APPS_SCRIPT_SECRET: secret };
@@ -17,6 +18,7 @@ const iterator = (values) => {
   };
 };
 function file(id, blob, parent = folderId) {
+  let trashed = false;
   return {
     getId: () => id,
     getName: () => blob.name,
@@ -25,7 +27,10 @@ function file(id, blob, parent = folderId) {
     getBlob: () => blob,
     getThumbnail: () => blob,
     getParents: () => iterator([{ getId: () => parent }]),
-    isTrashed: () => false,
+    isTrashed: () => trashed,
+    setTrashed: (value) => {
+      trashed = value;
+    },
     getDateCreated: () => new Date(),
     setDescription: () => {},
   };
@@ -48,6 +53,10 @@ const context = vm.createContext({
     createTextOutput: (text) => ({ setMimeType: () => text }),
   },
   Utilities: {
+    DigestAlgorithm: { SHA_256: "sha256" },
+    computeDigest: (_algorithm, bytes) => [
+      ...createHash("sha256").update(Buffer.from(bytes)).digest(),
+    ],
     base64Decode: (data) => [...Buffer.from(data, "base64")],
     base64Encode: (bytes) => Buffer.from(bytes).toString("base64"),
     formatDate: () => "2026-10-30",
@@ -130,6 +139,72 @@ assert.ok(
   !fs
     .readFileSync(path.join(__dirname, "Code.gs"), "utf8")
     .includes(".setSharing("),
+);
+
+// A photo larger than the Vercel request limit must be reconstructed byte-for-byte.
+delete properties.UPLOADS_ENABLED;
+const original = Buffer.alloc(4 * 1024 * 1024 + 317, 173);
+Buffer.from(png, "base64").copy(original);
+const originalHash = createHash("sha256").update(original).digest("hex");
+const originalRequest = {
+  uploadId: "original-upload-123456789",
+  name: "original-photo.png",
+  size: original.length,
+  sha256: originalHash,
+  guestName: "Guest",
+};
+assert.equal(call("begin", originalRequest).ok, true);
+assert.equal(
+  call("finish", { uploadId: originalRequest.uploadId }).ok,
+  false,
+  "Missing parts must not create a photo",
+);
+for (let index = 0; index < Math.ceil(original.length / 1048576); index++) {
+  const data = original
+    .subarray(index * 1048576, (index + 1) * 1048576)
+    .toString("base64");
+  const payload = { uploadId: originalRequest.uploadId, index, data };
+  assert.equal(call("part", payload).ok, true);
+  if (index === 0) {
+    const before = writes;
+    assert.equal(call("part", payload).ok, true);
+    assert.equal(writes, before, "Retry must not duplicate a part");
+    const resume = call("begin", originalRequest);
+    assert.equal(resume.data.received[0], 0);
+  }
+}
+const finalized = call("finish", { uploadId: originalRequest.uploadId });
+assert.equal(finalized.ok, true, JSON.stringify(finalized));
+const stored = saved.get(finalized.data.id);
+assert.equal(stored.getName(), "original-photo.png");
+assert.equal(stored.getSize(), original.length);
+assert.equal(
+  createHash("sha256")
+    .update(Buffer.from(stored.getBlob().getBytes()))
+    .digest("hex"),
+  originalHash,
+  "Original bytes must remain unchanged",
+);
+const beforeRetry = writes;
+assert.equal(
+  call("finish", { uploadId: originalRequest.uploadId }).data.id,
+  finalized.data.id,
+);
+assert.equal(
+  writes,
+  beforeRetry,
+  "Completed retry must not duplicate the original",
+);
+assert.ok(
+  [...saved.values()]
+    .filter((f) => f.getMimeType() === "application/octet-stream")
+    .every((f) => f.isTrashed()),
+  "Temporary parts must be cleaned up",
+);
+assert.equal(
+  call("list", {}).data.photos.length,
+  2,
+  "Temporary parts must not appear in the album",
 );
 
 async function proxyChecks() {
@@ -218,7 +293,7 @@ async function proxyChecks() {
 proxyChecks()
   .then(() =>
     console.log(
-      "PASS: Vercel proxy secret forwarding, origin rejection, action allowlist, missing configuration; Apps Script secret checks, fixed-folder upload, receipt retries, signatures, private previews, folder isolation and upload pause. External services were mocked; deployment verification is still required.",
+      "PASS: original 4+ MiB photo reconstructed with identical SHA-256, size and filename; chunk/final retries, missing-part rejection and temporary cleanup; proxy secret forwarding, origin checks, file validation and folder isolation. External services were mocked; deployment verification is still required.",
     ),
   )
   .catch((error) => {

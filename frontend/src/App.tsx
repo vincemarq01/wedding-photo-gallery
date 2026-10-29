@@ -279,7 +279,7 @@ export default function App() {
             </button>
             <small>
               {USE_APPS_SCRIPT
-                ? "JPG, PNG, WebP & HEIC · Up to 10 MB per photo. Large photos are compressed."
+                ? "Original quality · JPG, PNG, WebP & HEIC · Up to 10 MB per photo"
                 : "JPG, PNG, WebP, HEIC, MP4 & MOV · Up to 2 GB per file"}
             </small>
           </div>
@@ -306,14 +306,12 @@ export default function App() {
                     <small>
                       {format(i.file.size)} ·{" "}
                       {i.status === "uploading"
-                        ? USE_APPS_SCRIPT
-                          ? "Uploading..."
-                          : `${i.progress}% uploaded`
+                        ? `${i.progress}% uploaded`
                         : i.status === "failed"
                           ? "Ready to retry"
                           : "Ready to share"}
                     </small>
-                    {i.status === "uploading" && !USE_APPS_SCRIPT && (
+                    {i.status === "uploading" && (
                       <progress
                         max={100}
                         value={i.progress}

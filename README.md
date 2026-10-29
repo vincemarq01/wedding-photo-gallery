@@ -2,7 +2,7 @@
 
 **Current setup: keep this React site on Vercel and use Apps Script for Drive storage.** Follow [apps-script/README.md](apps-script/README.md). The same mobile design, upload page and View album route remain. The root `api/photos.ts` is the Vercel connection proxy; it requires server-only `APPS_SCRIPT_URL` and `APPS_SCRIPT_SECRET`. Cloud Run is not required in the default Apps Script mode. Use this project root as Vercel Root Directory, not frontend.
 
-Run `node apps-script/check.cjs` for mocked connection/security checks. Source photos up to 10 MB are accepted, with browser compression to a maximum 3 MiB transfer; videos are excluded in this simpler mode. This project never creates or publicly shares a destination folder.
+Run `node apps-script/check.cjs` for mocked connection/security checks. Original photos up to 10 MB are uploaded in 1 MiB parts and verified with SHA-256 without compression, resizing or conversion; videos are excluded in this simpler mode. This project never creates or publicly shares a destination folder.
 
 The remaining instructions describe the retained **legacy Express mode**, enabled only by `VITE_STORAGE_PROVIDER=express`.
 

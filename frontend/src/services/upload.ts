@@ -1,5 +1,5 @@
 import type { Memory } from "../types";
-import { USE_APPS_SCRIPT, preparePhoto, scriptCall } from "./appsScript";
+import { USE_APPS_SCRIPT, uploadOriginal } from "./appsScript";
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080";
 export const CHUNK = 4 * 1024 * 1024;
 async function json(path: string, init: RequestInit) {
@@ -50,9 +50,7 @@ export async function upload(
   onProgress: (n: number) => void,
 ) {
   if (USE_APPS_SCRIPT) {
-    const photo = await preparePhoto(memory.file);
-    await scriptCall("upload", { ...photo, uploadId: memory.id, guestName });
-    onProgress(100);
+    await uploadOriginal(memory.file, memory.id, guestName, onProgress);
     return;
   }
   let session = memory.session;
