@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.tools.json && tsc",
     "start": "node dist/server.js",
     "test": "tsx --test src/**/*.test.ts",
-    "verify-drive": "tsx --env-file=.env scripts/verify-drive.ts",
+    "verify-drive": "node --env-file=.env --import tsx ../scripts/verify-google-drive.mts",
     "oauth": "tsx --env-file=.env scripts/oauth.ts"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 {
   "name": "wedding-photo-sharing",
   "private": true,
+  "type": "module",
   "workspaces": [
     "frontend",
     "backend"

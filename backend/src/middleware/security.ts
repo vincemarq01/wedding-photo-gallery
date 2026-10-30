@@ -4,14 +4,15 @@ import { config } from "../config.js";
 import { unseal } from "../services/tokens.js";
 export const apiLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 1500,
+  // Reception Wi-Fi can put all 90 guests behind a single public IP.
+  limit: 50000,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Too many requests. Please wait a few minutes." },
 });
 export const createLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: config.MAX_BATCH_FILES * 4,
+  limit: 5000,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Upload limit reached. Please try again later." },

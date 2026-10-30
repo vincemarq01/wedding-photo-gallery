@@ -19,17 +19,16 @@ import {
   LockKeyhole,
   Plus,
   Upload,
-  Video,
   X,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import type { Memory } from "./types";
 import { authorize, upload } from "./services/upload";
-import { USE_APPS_SCRIPT, MAX_SOURCE_BYTES } from "./services/appsScript";
+import { MAX_PHOTO_BYTES, MAX_BATCH_FILES } from "./services/config";
 const schema = z.object({
   guestName: z.string().trim().max(80, "Please use 80 characters or fewer."),
 });
-const supported = /\.(jpe?g|png|webp|heic|heif|mp4|mov)$/i;
+const supported = /\.(jpe?g|png|webp|heic|heif)$/i;
 const format = (n: number) =>
   n >= 1024 ** 3
     ? (n / 1024 ** 3).toFixed(1) + " GB"
@@ -59,21 +58,12 @@ export default function App() {
     const messages: string[] = [];
     const next = [...latest.current];
     for (const file of Array.from(files)) {
-      if (
-        !(USE_APPS_SCRIPT ? /\.(jpe?g|png|webp|heic|heif)$/i : supported).test(
-          file.name,
-        )
-      ) {
-        messages.push(`${file.name}: choose a supported photo or video.`);
+      if (!supported.test(file.name)) {
+        messages.push(`${file.name}: choose JPG, PNG, WebP or HEIC photos.`);
         continue;
       }
-      if (
-        !file.size ||
-        file.size > (USE_APPS_SCRIPT ? MAX_SOURCE_BYTES : 2 * 1024 ** 3)
-      ) {
-        messages.push(
-          `${file.name}: choose a photo up to ${USE_APPS_SCRIPT ? "10 MB" : "2 GB"}.`,
-        );
+      if (!file.size || file.size > MAX_PHOTO_BYTES) {
+        messages.push(`${file.name}: choose a photo up to 10 MB.`);
         continue;
       }
       if (
@@ -85,8 +75,13 @@ export default function App() {
         )
       )
         continue;
-      if (next.length >= 50) {
-        messages.push("Please share up to 50 memories at a time.");
+      if (
+        next.filter((item) => item.status !== "success").length >=
+        MAX_BATCH_FILES
+      ) {
+        messages.push(
+          "Please share up to 20 photos per batch. You can add more after uploading.",
+        );
         break;
       }
       next.push({
@@ -127,35 +122,29 @@ export default function App() {
       );
       let cursor = 0;
       await Promise.all(
-        Array.from(
-          { length: Math.min(USE_APPS_SCRIPT ? 1 : 2, pending.length) },
-          async () => {
-            while (cursor < pending.length) {
-              const item = pending[cursor++];
-              patch(item.id, { status: "uploading", error: undefined });
-              try {
-                await upload(
-                  item,
-                  guestName,
-                  access,
-                  (s) => patch(item.id, { session: s }),
-                  (n) => patch(item.id, { progress: n }),
-                );
-                patch(item.id, { status: "success", progress: 100 });
-              } catch (e) {
-                if (
-                  e instanceof Error &&
-                  /authorization expired/.test(e.message)
-                )
-                  setBatch("");
-                patch(item.id, {
-                  status: "failed",
-                  error: e instanceof Error ? e.message : "Please retry.",
-                });
-              }
+        Array.from({ length: Math.min(2, pending.length) }, async () => {
+          while (cursor < pending.length) {
+            const item = pending[cursor++];
+            patch(item.id, { status: "uploading", error: undefined });
+            try {
+              await upload(
+                item,
+                guestName,
+                access,
+                (s) => patch(item.id, { session: s }),
+                (n) => patch(item.id, { progress: n }),
+              );
+              patch(item.id, { status: "success", progress: 100 });
+            } catch (e) {
+              if (e instanceof Error && /authorization expired/.test(e.message))
+                setBatch("");
+              patch(item.id, {
+                status: "failed",
+                error: e instanceof Error ? e.message : "Please retry.",
+              });
             }
-          },
-        ),
+          }
+        }),
       );
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Please try again.");
@@ -186,11 +175,7 @@ export default function App() {
             </span>
             <div>
               <h2>Add your memories</h2>
-              <p>
-                {USE_APPS_SCRIPT
-                  ? "A photo, a little moment."
-                  : "A photo, a video, a little moment."}
-              </p>
+              <p>A photo, a little moment.</p>
             </div>
           </div>
           <label className="name-label" htmlFor="guest">
@@ -215,11 +200,7 @@ export default function App() {
             type="file"
             className="sr-only"
             multiple
-            accept={
-              USE_APPS_SCRIPT
-                ? ".jpg,.jpeg,.png,.webp,.heic,.heif"
-                : ".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov"
-            }
+            accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
             onChange={(e) => {
               add(e.target.files);
               e.target.value = "";
@@ -230,7 +211,7 @@ export default function App() {
             ref={camera}
             type="file"
             className="sr-only"
-            accept={USE_APPS_SCRIPT ? "image/*" : "image/*,video/*"}
+            accept="image/*"
             capture="environment"
             onChange={(e) => {
               add(e.target.files);
@@ -255,19 +236,14 @@ export default function App() {
               <ImagePlus size={28} strokeWidth={1.3} />
             </span>
             <h3>Your moments belong here</h3>
-            <p className="picker-hint">
-              {USE_APPS_SCRIPT
-                ? "Pick photos from your gallery."
-                : "Pick photos & videos from your gallery."}
-            </p>
+            <p className="picker-hint">Pick photos from your gallery.</p>
             <Button
               variant="outline"
               type="button"
               disabled={busy}
               onClick={() => input.current?.click()}
             >
-              <Plus size={18} />{" "}
-              {USE_APPS_SCRIPT ? "Choose photos" : "Choose photos & videos"}
+              <Plus size={18} /> Choose photos
             </Button>
             <button
               type="button"
@@ -278,9 +254,7 @@ export default function App() {
               <Camera size={16} /> Take a photo
             </button>
             <small>
-              {USE_APPS_SCRIPT
-                ? "Original quality · JPG, PNG, WebP & HEIC · Up to 10 MB per photo"
-                : "JPG, PNG, WebP, HEIC, MP4 & MOV · Up to 2 GB per file"}
+              Original quality · JPG, PNG, WebP & HEIC · Up to 10 MB per photo
             </small>
           </div>
           {pending.length > 0 && (
@@ -294,11 +268,7 @@ export default function App() {
                     <img src={i.preview} alt="Selected memory preview" />
                   ) : (
                     <div className="file-placeholder">
-                      {/\.(mp4|mov)$/i.test(i.file.name) ? (
-                        <Video />
-                      ) : (
-                        <Camera />
-                      )}
+                      <Camera />
                     </div>
                   )}
                   <div className="file-detail">

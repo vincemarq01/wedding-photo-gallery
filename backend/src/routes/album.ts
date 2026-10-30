@@ -22,7 +22,7 @@ album.get("/album", async (req, res) => {
     page = grant.page;
   }
   const params = new URLSearchParams({
-    q: `'${config.GOOGLE_DRIVE_FOLDER_ID.replace(/'/g, "\\'")}' in parents and trashed = false and mimeType contains 'image/'`,
+    q: `'${config.GOOGLE_DRIVE_FOLDER_ID.replace(/'/g, "\\'")}' in parents and trashed = false and mimeType contains 'image/' and not name contains '.wedding-part-'`,
     fields:
       "nextPageToken,files(id,name,mimeType,createdTime,imageMediaMetadata(width,height))",
     pageSize: "30",
@@ -97,14 +97,11 @@ album.get("/album/image/:grant", async (req, res) => {
     // Small images without a generated thumbnail (including a just-uploaded photo).
     if (
       !["image/jpeg", "image/png", "image/webp"].includes(file.mimeType) ||
-      Number(file.size) > 10 * 1024 * 1024
+      Number(file.size) > 3 * 1024 * 1024
     ) {
-      res
-        .status(404)
-        .json({
-          error:
-            "Photo preview is still being prepared. Please refresh shortly.",
-        });
+      res.status(404).json({
+        error: "Photo preview is still being prepared. Please refresh shortly.",
+      });
       return;
     }
     url = `https://www.googleapis.com/drive/v3/files/${grant.id}?alt=media&supportsAllDrives=true`;

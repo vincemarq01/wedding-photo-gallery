@@ -21,8 +21,8 @@ export const config = z
       .int()
       .positive()
       .max(2 * 1024 ** 3)
-      .default(2 * 1024 ** 3),
-    MAX_BATCH_FILES: z.coerce.number().int().min(1).max(100).default(50),
+      .default(10 * 1024 * 1024),
+    MAX_BATCH_FILES: z.coerce.number().int().min(1).max(100).default(20),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(3).default(0),
   })
   .parse(process.env);

@@ -1,6 +1,5 @@
 import type { Memory } from "../types";
-import { USE_APPS_SCRIPT, uploadOriginal } from "./appsScript";
-const API = import.meta.env.VITE_API_URL || "http://localhost:8080";
+import { API } from "./config";
 export const CHUNK = 4 * 1024 * 1024;
 async function json(path: string, init: RequestInit) {
   const r = await fetch(API + path, init);
@@ -49,10 +48,6 @@ export async function upload(
   onSession: (s: string) => void,
   onProgress: (n: number) => void,
 ) {
-  if (USE_APPS_SCRIPT) {
-    await uploadOriginal(memory.file, memory.id, guestName, onProgress);
-    return;
-  }
   let session = memory.session;
   let offset = 0;
   if (session) {
@@ -91,7 +86,6 @@ export async function upload(
   onProgress(100);
 }
 export async function authorize() {
-  if (USE_APPS_SCRIPT) return "apps-script";
   return (
     await json("/api/authorize", {
       method: "POST",

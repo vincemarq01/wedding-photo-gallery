@@ -4,8 +4,25 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build --workspace frontend",
   "outputDirectory": "frontend/dist",
-  "functions": { "api/photos.ts": { "maxDuration": 60 } },
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "functions": { "api/drive.ts": { "maxDuration": 60 } },
+  "rewrites": [
+    { "source": "/api/authorize", "destination": "/api/drive?route=authorize" },
+    { "source": "/api/uploads", "destination": "/api/drive?route=uploads" },
+    {
+      "source": "/api/uploads/status",
+      "destination": "/api/drive?route=uploads/status"
+    },
+    {
+      "source": "/api/uploads/chunk",
+      "destination": "/api/drive?route=uploads/chunk"
+    },
+    { "source": "/api/album", "destination": "/api/drive?route=album" },
+    {
+      "source": "/api/album/image/:grant",
+      "destination": "/api/drive?route=album/image/:grant"
+    },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

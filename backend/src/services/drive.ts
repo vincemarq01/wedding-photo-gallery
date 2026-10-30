@@ -22,7 +22,7 @@ export async function driveFetch(url: string, init: RequestInit = {}) {
   const response = await fetch(url, {
     ...init,
     headers: { ...init.headers, Authorization: "Bearer " + token },
-    signal: AbortSignal.timeout(90000),
+    signal: AbortSignal.timeout(25000),
   });
   if (!response.ok && response.status !== 308) {
     const body = await response.json().catch(() => ({}));

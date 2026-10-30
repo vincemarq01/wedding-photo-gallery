@@ -1,5 +1,4 @@
-export const API = import.meta.env.VITE_API_URL || "http://localhost:8080";
-import { USE_APPS_SCRIPT, scriptCall } from "./appsScript";
+import { API } from "./config";
 export type AlbumPhoto = {
   id: string;
   name: string;
@@ -12,20 +11,6 @@ export async function getPhotos(
   cursor?: string,
   signal?: AbortSignal,
 ): Promise<{ photos: AlbumPhoto[]; nextCursor: string | null }> {
-  if (USE_APPS_SCRIPT) {
-    const data = await scriptCall<{
-      photos: { id: string; name: string; createdAt: string }[];
-      nextCursor: string | null;
-    }>("list", { cursor }, signal);
-    return {
-      photos: data.photos.map((photo) => ({
-        ...photo,
-        createdTime: photo.createdAt,
-        image: photo.id,
-      })),
-      nextCursor: data.nextCursor,
-    };
-  }
   const response = await fetch(
     API +
       "/api/album" +
@@ -45,7 +30,5 @@ export async function getPhotoSource(
   large: boolean,
   signal: AbortSignal,
 ): Promise<string> {
-  if (USE_APPS_SCRIPT)
-    return scriptCall<string>("preview", { id: photo.id, large }, signal);
   return API + photo.image;
 }
