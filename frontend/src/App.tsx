@@ -6,10 +6,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+import HomePage from "./pages/HomePage";
+import BottomNav from "./components/BottomNav";
 import PrintCard from "./pages/PrintCard";
 import AlbumPage from "./pages/AlbumPage";
 import { AppLink } from "./components/AppLink";
 import {
+  ArrowLeft,
   Camera,
   ArrowRight,
   CheckCircle2,
@@ -51,6 +54,8 @@ export default function App() {
     resolver: zodResolver(schema),
     defaultValues: { guestName: "" },
   });
+  if (pathname === "/" && window.location.hash !== "#share")
+    return <HomePage />;
   if (pathname === "/print") return <PrintCard />;
   if (pathname.replace(/\/$/, "") === "/album") return <AlbumPage />;
   function add(files: FileList | null) {
@@ -157,44 +162,31 @@ export default function App() {
   const success = items.filter((i) => i.status === "success");
   const pending = items.filter((i) => i.status !== "success");
   return (
-    <main className="simple-page">
-      <header className="simple-header">
-        <div className="header-mark">
+    <main className="relative mx-auto min-h-dvh max-w-[480px] bg-[#fff9f6] pb-[90px] md:my-8 md:min-h-[calc(100dvh-64px)] md:w-[calc(100%-64px)] md:max-w-[1200px] md:rounded-3xl md:border md:border-[#efdfda] md:shadow-[0_16px_70px_#a77e7212] px-6 md:grid md:grid-cols-[minmax(230px,.8fr)_minmax(0,1.2fr)] md:grid-rows-[80px_auto_auto_1fr_auto] md:gap-x-10 md:px-9 md:pb-0 [&>section]:md:col-start-2 [&>section]:md:row-start-2 [&>section]:md:row-end-5 [&>section]:md:py-10">
+      <nav
+        className="flex items-center justify-between pt-3 text-[15px] font-medium md:col-span-2 md:h-20 md:justify-start md:gap-3.5 md:border-b md:border-[#f0dfda] md:pt-0 md:pr-[360px] [&>a]:-ml-3 [&>a]:grid [&>a]:size-10 [&>a]:place-items-center [&>svg]:text-[#d08285] md:[&>svg]:hidden"
+        aria-label="Upload navigation"
+      >
+        <AppLink href="/" disabled={busy} aria-label="Back to home">
+          <ArrowLeft size={20} />
+        </AppLink>
+        <span>Upload Memories</span>
+        <Heart size={21} strokeWidth={1.4} />
+      </nav>
+      <header className="pt-[17px] pb-[22px] text-center md:col-start-1 md:row-start-2 md:self-end md:pt-[85px] md:pb-6 md:text-left [&>h1]:font-script [&>h1]:text-[56px] [&>h1]:leading-[1.15] [&>h1]:text-[#bf8682] md:[&>h1]:text-[clamp(54px,5.5vw,78px)] [&>h1_span]:text-[#bb8796] [&>p]:mt-1 [&>p]:text-[8px] [&>p]:tracking-[3px] [&>p]:text-[#b08787] md:[&>p]:mt-[18px] md:[&>p]:text-[10px] md:[&>p]:leading-loose">
+        <div className="hidden">
           <Heart size={20} strokeWidth={1.5} />
         </div>
         <h1>
-          Vince <span>&</span> Emy
+          Vince <span>&</span> Emyreen
         </h1>
-        <p>Share a little of our special day.</p>
+        <p>YOUR PHOTOS. OUR FOREVER.</p>
       </header>
       <section id="share">
-        <form onSubmit={handleSubmit(submit)} className="upload-card">
-          <div className="upload-heading">
-            <span className="upload-heading-icon">
-              <Camera size={20} />
-            </span>
-            <div>
-              <h2>Add your memories</h2>
-              <p>A photo, a little moment.</p>
-            </div>
-          </div>
-          <label className="name-label" htmlFor="guest">
-            Your name <span>(optional)</span>
-          </label>
-          <input
-            id="guest"
-            className="name-input"
-            placeholder="Your name"
-            autoComplete="name"
-            maxLength={80}
-            disabled={busy}
-            {...register("guestName")}
-          />
-          {errors.guestName && (
-            <p role="alert" className="error">
-              {errors.guestName.message}
-            </p>
-          )}
+        <form
+          onSubmit={handleSubmit(submit)}
+          className="md:rounded-[22px] md:border md:border-[#efdfda] md:bg-[#fffdfb] md:p-6 md:shadow-[0_12px_40px_#9a706608]"
+        >
           <input
             ref={input}
             type="file"
@@ -220,7 +212,12 @@ export default function App() {
             disabled={busy}
           />
           <div
-            className={"dropzone " + (drag ? "drag" : "")}
+            className={
+              "rounded-[17px] border border-dashed px-3.5 pt-6 pb-4 text-center md:px-4 md:pt-9 md:pb-6 [&>h3]:text-sm [&>h3]:font-semibold md:[&>h3]:text-base [&>small]:block [&>small]:text-[9px] [&>small]:leading-loose [&>small]:text-[#aa898b] [&>button:nth-of-type(2)]:min-h-9 [&>button:nth-of-type(2)]:rounded-full [&>button:nth-of-type(2)]:border-[#ecc4c5] [&>button:nth-of-type(2)]:bg-[#fffbf8] [&>button:nth-of-type(2)]:px-5 [&>button:nth-of-type(2)]:py-2 [&>button:nth-of-type(2)]:text-xs [&>button:nth-of-type(2)]:text-[#ae6f77] md:[&>button:nth-of-type(2)]:min-h-11 " +
+              (drag
+                ? "border-[#a56f7f] bg-[#f9edf1]"
+                : "border-[#e9acb1] bg-linear-to-br from-[#fff0ef] to-[#fce8e8]")
+            }
             onDragOver={(e) => {
               e.preventDefault();
               setDrag(true);
@@ -232,11 +229,19 @@ export default function App() {
               add(e.dataTransfer.files);
             }}
           >
-            <span className="drop-icon">
-              <ImagePlus size={28} strokeWidth={1.3} />
-            </span>
-            <h3>Your moments belong here</h3>
-            <p className="picker-hint">Pick photos from your gallery.</p>
+            <button
+              type="button"
+              className="mx-auto mb-3 grid size-[59px] place-items-center rounded-full border-0 bg-[#ffe0e3] text-[#d97e8c]"
+              aria-label="Choose photos"
+              disabled={busy}
+              onClick={() => input.current?.click()}
+            >
+              <Upload size={28} strokeWidth={1.3} />
+            </button>
+            <h3>Tap to upload or drag and drop</h3>
+            <p className="mt-1 mb-3 text-xs text-[#a17f80] md:text-[13px]">
+              Every little moment is welcome!
+            </p>
             <Button
               variant="outline"
               type="button"
@@ -247,7 +252,7 @@ export default function App() {
             </Button>
             <button
               type="button"
-              className="camera-link"
+              className="mx-auto my-1 flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-4 text-[11px] text-[#8d6576] hover:bg-[#f3e7ec]"
               onClick={() => camera.current?.click()}
               disabled={busy}
             >
@@ -258,20 +263,23 @@ export default function App() {
             </small>
           </div>
           {pending.length > 0 && (
-            <div className="file-section">
+            <div className="my-3.5 grid grid-cols-3 gap-2.5 [&>h4]:col-span-full [&>h4]:mt-3 [&>h4]:text-[13px] [&>h4]:font-medium [&>h4_span]:text-[#a97e8a]">
               <h4>
                 Selected files <span>{pending.length}</span>
               </h4>
               {pending.map((i) => (
-                <div className="file-row" key={i.id}>
+                <div
+                  className="relative flex min-w-0 flex-col gap-1 pb-2 [&>img]:aspect-[1.2] [&>img]:w-full [&>img]:rounded-[10px] [&>img]:object-cover"
+                  key={i.id}
+                >
                   {i.preview ? (
                     <img src={i.preview} alt="Selected memory preview" />
                   ) : (
-                    <div className="file-placeholder">
+                    <div className="grid aspect-[1.2] w-full place-items-center rounded-[10px] bg-[#f8eff2] text-[#b68e9a] [&>svg]:size-5">
                       <Camera />
                     </div>
                   )}
-                  <div className="file-detail">
+                  <div className="w-full min-w-0 [&>strong]:block [&>strong]:truncate [&>strong]:text-[10px] [&>strong]:font-medium [&>small]:text-[9px] [&>small]:text-[#8e7983] [&>progress]:mt-2 [&>progress]:block [&>progress]:h-[5px] [&>progress]:w-full [&>progress]:accent-[#a87584]">
                     <strong>{i.file.name}</strong>
                     <small>
                       {format(i.file.size)} ·{" "}
@@ -288,11 +296,15 @@ export default function App() {
                         aria-label={`Uploading ${i.file.name}`}
                       />
                     )}{" "}
-                    {i.error && <p className="error">{i.error}</p>}
+                    {i.error && (
+                      <p className="mt-2 text-xs leading-relaxed wrap-anywhere text-[#a3445b]">
+                        {i.error}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"
-                    className="remove"
+                    className="absolute -top-2 -right-2 grid size-8 place-items-center rounded-full border-[3px] border-[#fff9f6] bg-[#785957e6] p-1.5 text-white hover:bg-[#976e82]"
                     aria-label={"Remove " + i.file.name}
                     disabled={busy}
                     onClick={() => {
@@ -306,19 +318,48 @@ export default function App() {
               ))}
             </div>
           )}
+          <label
+            className="mt-[22px] mb-2 block text-xs font-medium [&>span]:text-[11px] [&>span]:font-normal [&>span]:text-[#96838b]"
+            htmlFor="guest"
+          >
+            Your name <span>(optional)</span>
+          </label>
+          <input
+            id="guest"
+            className="min-h-12 w-full rounded-xl border border-[#ecdcda] bg-[#fffaf9] px-3.5 py-3 text-base outline-[#a4727d] placeholder:text-sm placeholder:text-[#a6939c]"
+            placeholder="Your name"
+            autoComplete="name"
+            maxLength={80}
+            disabled={busy}
+            {...register("guestName")}
+          />
+          {errors.guestName && (
+            <p
+              role="alert"
+              className="mt-2 text-xs leading-relaxed wrap-anywhere text-[#a3445b]"
+            >
+              {errors.guestName.message}
+            </p>
+          )}
           {notice && (
-            <p role="alert" className="notice">
+            <p
+              role="alert"
+              className="mt-2 text-xs leading-relaxed wrap-anywhere text-[#a3445b]"
+            >
               {notice}
             </p>
           )}
-          {pending.length > 0 && (
+          {(pending.length > 0 || !success.length) && (
             <Button
-              className="upload-button"
+              className="mt-[22px] min-h-[50px] w-full rounded-full bg-linear-to-r from-[#df9792] to-[#d97d88] p-3 text-sm font-medium text-white disabled:from-[#e9bcc0] disabled:to-[#e9bcc0] disabled:text-[#fffaf9] disabled:opacity-100"
               disabled={busy || !pending.length}
               type="submit"
             >
               {busy ? (
-                <LoaderCircle size={18} className="spin" />
+                <LoaderCircle
+                  size={18}
+                  className="animate-spin motion-reduce:animate-none"
+                />
               ) : (
                 <Upload size={18} />
               )}{" "}
@@ -327,16 +368,19 @@ export default function App() {
                 : pending.some((i) => i.status === "failed")
                   ? "Retry upload"
                   : pending.length
-                    ? `Upload ${pending.length} ${pending.length === 1 ? "file" : "files"}`
-                    : "Upload photos"}
+                    ? `Upload to Album (${pending.length})`
+                    : "Upload to Album"}
             </Button>
           )}
-          <p className="privacy">
+          <p className="mx-auto mt-3 flex max-w-[340px] items-baseline justify-center gap-1 text-center text-[10px] leading-loose text-[#8f7b84] [&>svg]:relative [&>svg]:top-0.5 [&>svg]:shrink-0">
             <LockKeyhole size={12} /> Visible to everyone visiting this page. No
             account needed.
           </p>
           {success.length > 0 && (
-            <div className="thank-you" role="status">
+            <div
+              className="mt-4 flex min-h-12 flex-wrap items-center gap-2 rounded-[10px] bg-[#f0f6f0] p-3 text-xs text-[#648567] [&>svg]:shrink-0"
+              role="status"
+            >
               <CheckCircle2 size={18} />
               <span>
                 {success.length} {success.length === 1 ? "file" : "files"}{" "}
@@ -345,7 +389,7 @@ export default function App() {
               <AppLink
                 href="/album"
                 disabled={busy}
-                className="success-album-link"
+                className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 font-medium"
               >
                 View album <ArrowRight size={15} />
               </AppLink>
@@ -353,14 +397,19 @@ export default function App() {
           )}
         </form>
       </section>
-      <Button asChild variant="outline" className="view-album-button">
+      <Button
+        asChild
+        variant="outline"
+        className="mt-4 flex min-h-[50px] w-full rounded-full border-[#eed9d7] bg-transparent text-sm text-[#ae7c80] md:col-start-1 md:row-start-3 md:mt-0 md:max-w-[290px] md:self-start [&>svg:last-child]:ml-auto [&>svg:first-child]:mr-auto"
+      >
         <AppLink href="/album" disabled={busy}>
           <ImagePlus size={18} />
           View album
           <ArrowRight size={16} />
         </AppLink>
       </Button>
-      <footer>
+      <BottomNav active="upload" disabled={busy} />
+      <footer className="flex items-center justify-between py-6 text-[10px] text-[#96808b] md:col-span-full md:row-start-5 md:border-t md:border-[#f0dfda] [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center [&>a]:pl-4 [&>a]:text-[#8e6379]">
         <span>With love, Vince & Emy</span>
         <a href="/print">QR card</a>
       </footer>
