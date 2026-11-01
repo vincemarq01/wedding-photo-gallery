@@ -35,7 +35,7 @@ export default function HomePage() {
         >
           <AppLink href="/upload">Upload memories</AppLink>
           <AppLink href="/album">View gallery</AppLink>
-          <AppLink href="/print">Print QR card</AppLink>
+          {/* <AppLink href="/print">Print QR card</AppLink> */}
         </nav>
       )}
       <section
